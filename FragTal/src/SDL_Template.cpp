@@ -3,15 +3,15 @@
 SDL_Template::SDL_Template() {
 	sdl_WindowPtr = nullptr;
 	sdl_WindowTitle = "SDL Template";
-	sdl_WindowWidth = 600;
-	sdl_WindowHeight = 500;
+	sdl_WindowWidth = 2560;
+	sdl_WindowHeight = 1440;
 	sdl_WindowState = WindowState::ACTIVE;
 	sdl_TextureSize = 0;
 }
 SDL_Template::~SDL_Template() {
 	sdl_Quit();
 }
-// Output Errors
+
 void SDL_Template::sdl_PrintError(std::string ErrorList) {
 	std::cout << ErrorList << std::endl;
 	std::cin.get();
@@ -21,7 +21,12 @@ void SDL_Template::sdl_PrintError(std::string ErrorList) {
 
 void SDL_Template::sdl_Init() {
 	// Setting Scaling as Nearest Pixel Sampling
-	SDL_bool HintError = SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, 0);
+	SDL_bool HintError = SDL_SetHintWithPriority(SDL_HINT_WINDOWS_DPI_AWARENESS, SDL_GetHint(SDL_HINT_WINDOWS_DPI_AWARENESS), SDL_HINT_OVERRIDE);
+	if (HintError != SDL_TRUE) {
+		sdl_PrintError("SDL hint could not be set! " + std::string(SDL_GetError()));
+	}
+
+	HintError = SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, 0);
 	if (HintError != SDL_TRUE) {
 		sdl_PrintError("SDL hint could not be set! " + std::string(SDL_GetError()));
 	}
@@ -36,8 +41,8 @@ void SDL_Template::sdl_Init() {
 		sdl_PrintError("SDL Subsystems could not be initialized!" + std::string(SDL_GetError()));
 	}
 
-	sdl_WindowPtr = SDL_CreateWindow(sdl_WindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, sdl_WindowWidth, sdl_WindowHeight, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI); // | SDL_WINDOW_FULLSCREEN);
-
+	sdl_WindowPtr = SDL_CreateWindow(sdl_WindowTitle, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, sdl_WindowWidth, sdl_WindowHeight, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_MAXIMIZED); // | SDL_WINDOW_FULLSCREEN
+	
 	if (sdl_WindowPtr == nullptr) {
 		sdl_PrintError("SDL window could not be created!" + std::string(SDL_GetError()));
 	}
@@ -46,8 +51,6 @@ void SDL_Template::sdl_Init() {
 	if (sdl_RendererPtr == nullptr) {
 		sdl_PrintError("SDL rendering context could not be created!" + std::string(SDL_GetError()));
 	}
-
-	//SDL_RenderSetScale(sdl_RendererPtr, 0.5f, 0.5f);
 
 	// Using Alpha Blending for SDL_RenderCopy()*
 	if (SDL_SetRenderDrawBlendMode(sdl_RendererPtr, SDL_BLENDMODE_BLEND) != 0) {
@@ -73,24 +76,23 @@ void SDL_Template::sdl_DeleteTexture() {
 }
 
 void SDL_Template::sdl_InputEvent() {
-	/*SDL_Event sdl_Event;
-	while (SDL_PollEvent(&sdl_Event)) {
-		ImGui_ImplSDL2_ProcessEvent(&sdl_Event);
-		if (sdl_Event.type == SDL_QUIT) {
-			sdl_WindowState = WindowState::EXIT;
-		}
-		if (sdl_Event.type == SDL_WINDOWEVENT && sdl_Event.window.event == SDL_WINDOWEVENT_CLOSE && sdl_Event.window.windowID == SDL_GetWindowID(sdl_WindowPtr)) {
-			sdl_WindowState = WindowState::EXIT;
-		}
-	}*/
 
 	SDL_Event event;
+	
 	while (SDL_PollEvent(&event))
 	{
 		ImGui_ImplSDL2_ProcessEvent(&event);
 
 		if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(sdl_WindowPtr) || event.type == SDL_QUIT) {
 			sdl_WindowState = WindowState::EXIT;
+		}
+		else if (event.type == SDL_KEYDOWN) {
+			if (event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
+				sdl_WindowState = WindowState::EXIT;
+			}
+			else if (event.key.keysym.scancode == SDL_SCANCODE_F1) {
+				SDL_SetWindowFullscreen(sdl_WindowPtr, SDL_WINDOW_MAXIMIZED);
+			}
 		}
 	}
 }
@@ -116,6 +118,7 @@ void SDL_Template::sdl_RenderBegin() {
 		sdl_PrintError("The rendering target could not be cleared!" + std::string(SDL_GetError()));
 	}
 }
+
 void SDL_Template::sdl_RenderEnd() {
 	// Copying the texture to the already cleared rendering target
 	/*if (SDL_RenderCopy(sdl_RendererPtr, sdl_TexturePtr, NULL, &sdl_ScrrenSize) != 0) {

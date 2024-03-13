@@ -5,12 +5,14 @@
 #endif
 
 namespace {
+    Utils::Timer watch;
+    static float iTime;
+    static double pausedTime;
 
     //  These have Internal Linkage & Static storage duration
+    bool isRecompiled = false;
 
     std::wstring gdllPath = L" ";
-
-    bool isDllLoaded = false;
 
     MainImageType mainImageFromDLL = NULL;
     HINSTANCE handle = NULL;
@@ -22,12 +24,10 @@ namespace {
 
 AppGUI::AppGUI() : sdl_instance(), icons() {
 	app_Title = "FragTal";
-    app_WindowWidth = 2560;
-    app_WindowHeight = 1370;
+    app_WindowWidth = 2000;
+    app_WindowHeight = 1250;
 
 	// ImGUI State Variables
-	show_demo_window = true;
-	show_another_window = false;
 	clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // ImGUI Font Setting Variables
@@ -38,204 +38,74 @@ AppGUI::AppGUI() : sdl_instance(), icons() {
     icon = nullptr;
     iconSize = 23.0f;
 
+    icons.playbutton = true;
+    icons.expandbutton = true;
+
     fileContent = " ";
 }
 AppGUI::~AppGUI() {
 
 }
 
-namespace Utils {
-
-    void PrintVec2(const char* vecName, glm::vec2 vec) {
-        std::cout << vecName << std::endl;
-        std::cout << "X => " << vec.r << std::endl;
-        std::cout << "Y => " << vec.g << std::endl;
+bool operator==(const ImVec2& lval, const ImVec2& rval) {
+    if (lval.x == rval.x && lval.y == rval.y) {
+        return true;
     }
-    void PrintVec2(const char* vecName, ImVec2 vec) {
-        std::cout << vecName << std::endl;
-        std::cout << "X => " << vec.x << std::endl;
-        std::cout << "Y => " << vec.y << std::endl;
-    }
-    void PrintVec3(const char* vecName, glm::vec3 vec) {
-        std::cout << vecName << std::endl;
-        std::cout << "X => " << vec.r << std::endl;
-        std::cout << "Y => " << vec.g << std::endl;
-        std::cout << "Z => " << vec.b << std::endl;
-    }
-    void PrintVec4(const char* vecName, glm::vec4 vec) {
-        std::cout << vecName << std::endl;
-        std::cout << "X => " << vec.r << std::endl;
-        std::cout << "Y => " << vec.g << std::endl;
-        std::cout << "Z => " << vec.b << std::endl;
-        std::cout << "W => " << vec.a << std::endl;
-    }
-    void SaveFile(const char* filepath, auto textToSave) {
-        std::ofstream myfile(filepath);
-        if (myfile.is_open())
-        {
-            myfile << textToSave;
-            myfile.close();
-        }
-        else {
-            std::cout << "Unable to open file" << std::endl;
-        }
-    }
-    std::string LoadTxtFile() {
-
-        std::ifstream file("temp/Error.txt");
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string fileContent = buffer.str();
-
-        return fileContent;
-    }
-
-    std::wstring ConvertStringtoWstring(std::string FilePath) {
-        return std::wstring(FilePath.begin(), FilePath.end());
-    }
-    
-    std::string ConvertWStringtoString(std::wstring FilePath) {
-        return std::string(FilePath.begin(), FilePath.end());
-    }
-
-    const char* BoolToString(bool value) {
-        return value ? "true" : "false";
-    }
-
-    bool StringToBool(const std::string& str) {
-        std::string lowercaseStr;
-        for (char c : str) {
-            lowercaseStr += std::tolower(c);
-        }
-        if (lowercaseStr == "1") {
-            return true;
-        }
+    else {
         return false;
     }
-
-    /// <param name="errorFilePath"> Takes a string of the file path where compilation error will be saved.</param>
-    void CompileFileWithConsole(std::string errFilePath) {
-        if (!std::filesystem::exists(errFilePath)) {
-            std::cout << "Temp File Not Found!" << std::endl;
-        }
-
-        std::string compileCommand = "g++ -std=c++2a -O3 -shared -o Shader.dll -I../../deps/include src/Shader.cpp 2> " + errFilePath;
-        std::system(compileCommand.c_str());
-    }
-
-    /// <summary>
-    /// Found this code from Here: https://cboard.cprogramming.com/windows-programming/109024-createprocess-plus-command-line.html
-    /// , https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw
-    /// , https://stackoverflow.com/questions/515309/what-does-cmd-c-mean
-    /// </summary>
-    /// <param name="errorFilePath"> Takes a string of the file path where compilation error will be saved.</param>
-    void CompileFileWithoutConsole(std::string errFilePath) {
-        
-        if (!std::filesystem::exists(errFilePath)) {
-            std::cout << "Temp File Not Found!" << std::endl;
-            return;
-        }
-
-        STARTUPINFO si = { sizeof(STARTUPINFO) };
-        PROCESS_INFORMATION pi;
-
-        ZeroMemory(&si, sizeof(si));
-        si.cb = sizeof(si);
-        ZeroMemory(&pi, sizeof(pi));
-
-        std::wstring werrFilePath = Utils::ConvertStringtoWstring(errFilePath);
-        std::wstring app = L"cmd.exe /C g++ -std=c++2a -O3 -march=native -flto -shared -o \"" + gdllPath + L"\" -I..\\..\\deps\\include src\\Shader.cpp 2> " + werrFilePath;
-        
-        if (CreateProcess( /// Creating a separate process for compilation
-            NULL,
-            const_cast<LPWSTR>(app.c_str()),
-            NULL,
-            NULL,
-            FALSE,
-            CREATE_NO_WINDOW,
-            NULL,
-            NULL,
-            &si,
-            &pi)) {
-
-            // Close handles to the process and thread immediately after starting
-            WaitForSingleObject(pi.hProcess, INFINITE);
-            CloseHandle(pi.hProcess);
-            CloseHandle(pi.hThread);
-        }
-        else {
-            std::cout << "Failed to launch the process " << GetLastError()  << std::endl;
-            CloseHandle(pi.hProcess);
-            CloseHandle(pi.hThread);
-        }
-    }
 }
 
-ImGuiIO& AppGUI::Init() {
-	// Creating SDL window and rendering context
-	sdl_instance.sdl_CreateWindow(app_Title, app_WindowWidth, app_WindowHeight);
-
-	// Create ImGUI Context
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
-    // Pass ImGui flags
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad | ImGuiConfigFlags_DockingEnable;
-
-    io.IniFilename = "FragTal.ini";
-
-	// Setup Dear ImGui style
-    ImGui::StyleColorsCustom();
-    // Load the Custom Font
-    LoadFont(io, fontSize);
-    // Load the Custom Icons
-    LoadIcons(io, iconSize);
-
-	// Setup Platform/Renderer backends
-	ImGui_ImplSDL2_InitForSDLRenderer(sdl_instance.sdl_WindowPtr, sdl_instance.sdl_RendererPtr);
-	ImGui_ImplSDLRenderer2_Init(sdl_instance.sdl_RendererPtr);
-
-    // Initialize the Editor
-    InitEditor();
-
-    /// To-Do: If the DLL is generating runtime error in the middle and the application crashes as we are loading dll everytime at initialization, this will lock the application where rebuiling the app would not work 
-    /// Fix: Implement a DLL check in another environment or maybe add a failsafe or fallback system, where the app will fallback to it's last working version
-    // Loading the DLL
-    LoadDLL();
-
-	return io;
+void AppGUI::Run() {
+    RenderLoop();
 }
 
-void AppGUI::InitEditor() {
-    // TEXT EDITOR SAMPLE
-    auto lang = TextEditor::LanguageDefinition::CPlusPlus();
+void AppGUI::LoadDLLPath() {
 
-    editor.SetLanguageDefinition(lang);
-    //editor.SetPalette(TextEditor::GetLightPalette());
+    wchar_t exePath[MAX_PATH]; // Use wide-character string
+    GetModuleFileNameW(nullptr, exePath, MAX_PATH); // Use GetModuleFileNameW
 
-    // error markers
-    /*TextEditor::ErrorMarkers markers;
-    markers.insert(std::make_pair<int, std::string>(6, "Example error here:\nInclude file not found: \"TextEditor.h\""));
-    markers.insert(std::make_pair<int, std::string>(41, "Another example error"));
-    editor.SetErrorMarkers(markers);*/
-
-    // "breakpoint" markers
-    //TextEditor::Breakpoints bpts;
-    //bpts.insert(24);
-    //bpts.insert(47);
-    //editor.SetBreakpoints(bpts);
-
-    //	static const char* fileToEdit = "test.cpp";
-
-    {
-        std::ifstream t(fileToEdit);
-        if (t.good())
-        {
-            std::string str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-            editor.SetText(str);
-        }
+    std::wstring exeDirectory = std::wstring(exePath);
+    // Note: Converting exe file path to directory path
+    size_t pos = exeDirectory.find_last_of(L"\\/");
+    if (pos != std::wstring::npos) {
+        exeDirectory = exeDirectory.substr(0, pos);
     }
 
+    std::wstring dllPath = exeDirectory + L"\\" + wdllName;
+
+    // Note: Store exe and dll path to make it available globally
+    ::gdllPath = dllPath;
+    exeFilePath = Utils::ConvertWStringtoString(exeDirectory);
+}
+
+bool AppGUI::LoadDLL() {
+
+    // Note: Remember to call LoadDLLPath() before LoadDLL()
+
+    // Load the DLL
+    ::handle = LoadLibrary((LPCWSTR)::gdllPath.c_str());
+
+    if (!::handle) {
+
+        fileContent = "Error: Unable to load " + std::string(dllName);
+        return false;
+    }
+    // Obtain function pointer to mainImage() from DLL
+    ::mainImageFromDLL = reinterpret_cast<MainImageType>(GetProcAddress(::handle, "mainImage"));
+    if (!::mainImageFromDLL) {
+
+        fileContent = "Error: Undefined function 'mainImage()'\n";
+        return false;
+    }
+    return true;
+}
+
+std::string AppGUI::LoadINIPath() {
+    // Loading ini file here
+    std::filesystem::path filePath = std::string(exeFilePath + "\\" + appUIConfigPath);
+    // Converting it from "\\" to "/"
+    return filePath.generic_string();
 }
 
 void AppGUI::LoadFont(ImGuiIO& io, float fontSize) {
@@ -265,39 +135,36 @@ void AppGUI::LoadIcons(ImGuiIO& io, float fontSize) {
     ////ImGui::Text(ICON_FA_ADDRESS_BOOK "  Paint"); // use string literal concatenation
     //// outputs a paint brush icon and 'Paint' as a string.
 
-    float baseFontSize = fontSize; // 13.0f is the size of the default font. Change to the font size you use.
-    //float iconFontSize = baseFontSize * 2.0f / 3.0f; // FontAwesome fonts need to have their sizes reduced by 2.0f/3.0f in order to align correctly
-    // merge in icons from Font Awesome
+    // Reference: https://github.com/ocornut/imgui/blob/master/docs/FONTS.md
+
+    float IconSize = fontSize;
     static const ImWchar icons_ranges[] = { ICON_MIN, ICON_MAX, 0 };
     ImFontConfig icons_config;
     icons_config.MergeMode = true;
     icons_config.PixelSnapH = true;
-    icons_config.GlyphMinAdvanceX = baseFontSize;
-    icon = io.Fonts->AddFontFromFileTTF(FRAGTAL_FONT, baseFontSize, &icons_config, icons_ranges);
+    icons_config.GlyphMinAdvanceX = IconSize;
+    icon = io.Fonts->AddFontFromFileTTF(FRAGTAL_FONT, IconSize, &icons_config, icons_ranges);
     io.Fonts->Build();
 }
 
-void AppGUI::Run() {
-    RenderLoop();
-}
-
 bool AppGUI::LoadIconState(std::string file, bool& icon1, bool& icon2) {
+    /// Using ini parser from here: https://github.com/metayeti/mINI
 
-    // first, create a file instance
+    if (!std::filesystem::exists(file)) {
+        std::cout << "Error: Iconstate Config File Not Found!" << std::endl;
+
+        return false;
+    }
+
     mINI::INIFile configFile(file);
-
-    // next, create a structure that will hold data
     mINI::INIStructure ini;
-
-    // now we can read the file
     bool readSuccess = configFile.read(ini);
 
-    // read a value
-    std::string iconstring1 = ini.get("iconstate").get("playbutton");
-    std::string iconstring2 = ini.get("iconstate").get("expandbutton");
+    std::string iconstate1 = ini.get("iconstate").get("playbutton");
+    std::string iconstate2 = ini.get("iconstate").get("expandbutton");
 
-    icon1 = Utils::StringToBool(iconstring1);
-    icon2 = Utils::StringToBool(iconstring2);
+    icon1 = Utils::StringToBool(iconstate1);
+    icon2 = Utils::StringToBool(iconstate2);
 
     return readSuccess;
 }
@@ -317,53 +184,125 @@ bool AppGUI::WriteIconState(std::string file, bool icon1, bool icon2) {
 	return false;
 }
 
+void AppGUI::InitEditor() {
+
+    auto lang = TextEditor::LanguageDefinition::CPlusPlus();
+
+    editor.SetLanguageDefinition(lang);
+    //editor.SetPalette(TextEditor::GetLightPalette());
+
+    // error markers
+    /*TextEditor::ErrorMarkers markers;
+    markers.insert(std::make_pair<int, std::string>(6, "Example error here:\nInclude file not found: \"TextEditor.h\""));
+    markers.insert(std::make_pair<int, std::string>(41, "Another example error"));
+    editor.SetErrorMarkers(markers);*/
+
+    // "breakpoint" markers
+    //TextEditor::Breakpoints bpts;
+    //bpts.insert(24);
+    //bpts.insert(47);
+    //editor.SetBreakpoints(bpts);
+
+    //	static const char* fileToEdit = "test.cpp";
+
+    {
+        std::ifstream t(fileToEdit);
+        if (t.good())
+        {
+            std::string str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+            editor.SetText(str);
+        }
+    }
+}
+
+ImGuiIO& AppGUI::Init() {
+    // Creating SDL window and rendering context
+    sdl_instance.sdl_CreateWindow(app_Title, app_WindowWidth, app_WindowHeight);
+
+    // Load the path where DLLs will be saved
+    LoadDLLPath();
+
+    // Check ImGUI Version
+    IMGUI_CHECKVERSION();
+
+    // Create ImGUI Context
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    // Pass ImGui flags
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad | ImGuiConfigFlags_DockingEnable;
+    // Using custom ini load and save
+    io.IniFilename = NULL;
+
+    // Loading ini file here
+    std::string iniFile = LoadINIPath();
+    ImGui::LoadIniSettingsFromDisk(iniFile.c_str());
+
+    // Setup Dear ImGui style
+    UITheme::SetUITheme();
+    // Load the Custom Font
+    LoadFont(io, fontSize);
+    // Load the Custom Icons
+    LoadIcons(io, iconSize);
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplSDL2_InitForSDLRenderer(sdl_instance.sdl_WindowPtr, sdl_instance.sdl_RendererPtr);
+    ImGui_ImplSDLRenderer2_Init(sdl_instance.sdl_RendererPtr);
+
+    // Initialize the Editor
+    InitEditor();
+
+    // Load the DLL
+    LoadDLL();
+
+    return io;
+}
+
 void AppGUI::RenderLoop() {
 
-    ImGuiIO& io = Init(); (void)io;
+	ImGuiIO& io = Init(); (void)io;
 
-    // Load the Icon state From Disk here
-    if (!LoadIconState(std::string(exeFilePath + "\\" + iconConfigPath), icons.playbutton, icons.expandbutton)) {
-      fileContent = "Error: Icon State variables cannot be read!";
-    }
+	// Load the Icon state From Disk here
+	if (!LoadIconState(std::string(exeFilePath + "\\" + iconConfigPath), icons.playbutton, icons.expandbutton)) {
+		std::cout << "Error: Iconstate variables cannot be read!" << std::endl;
+	}
 
-    while (sdl_instance.sdl_WindowState == WindowState::ACTIVE) {
+	while (sdl_instance.sdl_WindowState == WindowState::ACTIVE) {
 
-        // start = std::chrono::high_resolution_clock::now();
+		SDL_SetRenderDrawColor(sdl_instance.sdl_RendererPtr, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255), (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
+		sdl_instance.sdl_RenderBegin();
+		sdl_instance.sdl_InputEvent();
 
-        sdl_instance.sdl_RenderBegin();
-        sdl_instance.sdl_InputEvent();
+		/// Viewport window resizing
+		if (viewportShrink) {
+            // Load last UI layout
+			ImGui::LoadIniSettingsFromDisk(std::string(exeFilePath + "\\" + editorConfigPath).c_str());
+			viewportShrink = false;
+		}
 
-        /// Viewport window resizing
-        if (viewportShrink) {
-            ImGui::LoadIniSettingsFromDisk(std::string(exeFilePath + "\\" + editorConfigPath).c_str());
-            viewportShrink = false;
-        }
+		// Start the Dear ImGui frame
+		ImGui_ImplSDLRenderer2_NewFrame();
+		ImGui_ImplSDL2_NewFrame();
+		ImGui::NewFrame();
 
-        // Start the Dear ImGui frame
-        ImGui_ImplSDLRenderer2_NewFrame();
-        ImGui_ImplSDL2_NewFrame();
-        ImGui::NewFrame();
+		RenderUI();
 
-        RenderUI();
-
-        ImGui::EndFrame();
-        ImGui::Render();
+		ImGui::EndFrame();
+		ImGui::Render();
 
         SDL_RenderSetScale(sdl_instance.sdl_RendererPtr, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-        SDL_SetRenderDrawColor(sdl_instance.sdl_RendererPtr, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255), (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
-        //SDL_RenderClear(renderer);
-        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
+		ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
 
-        sdl_instance.sdl_RenderEnd();
+		sdl_instance.sdl_RenderEnd();
+	}
 
-		// end = std::chrono::high_resolution_clock::now();
-		// duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    }
-
-    // Write the Icon state to Disk before cleanup here
+    // Write the Icon state to Disk before cleanup
     if (!WriteIconState(std::string(exeFilePath + "\\" + iconConfigPath), icons.playbutton, icons.expandbutton)) {
-        std::cout << "Error: Icon Config could not be saved!" << std::endl;
+        std::cout << "Error: Iconstate config could not be saved!" << std::endl;
     }
+
+    // Save imGui UI layout
+    std::string iniFile = LoadINIPath();
+    ImGui::SaveIniSettingsToDisk(iniFile.c_str());
 
     // Cleanup
     ImGui_ImplSDLRenderer2_Shutdown();
@@ -410,9 +349,10 @@ void AppGUI::RenderUI() {
             // any change of dockspace/settings would lead to windows being stuck in limbo and never being visible.
             if (!opt_padding)
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-                ImGui::Begin("DockSpace Demo", nullptr, window_flags);
+                //ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 9.0f));
+                ImGui::Begin(" DockSpace ", nullptr, window_flags);
             if (!opt_padding)
-                ImGui::PopStyleVar();
+                ImGui::PopStyleVar(); // ImGui::PopStyleVar(2);
 
             if (opt_fullscreen)
                 ImGui::PopStyleVar(2);
@@ -436,6 +376,8 @@ void AppGUI::RenderUI() {
 
             if (ImGui::BeginMenuBar())
             {
+                //ImGui::SetCursorPos(ImVec2(100.0f, 5.0f));
+                //ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.1882f, 0.1960f, 0.2f, 0.0f));
                 if (ImGui::BeginMenu("Options"))
                 {
                     // Disabling fullscreen would allow the window to be moved to the front of other windows,
@@ -454,11 +396,12 @@ void AppGUI::RenderUI() {
                     ImGui::EndMenu();
                 }
                 ImGui::EndMenuBar();
+                //ImGui::PopStyleColor();
             }
 
             /// Viewport window resizing
             if (viewportExpand) {
-
+                // Save existing UI layout
                 ImGui::SaveIniSettingsToDisk(std::string(exeFilePath + "\\" + editorConfigPath).c_str());
 
                 ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -472,22 +415,20 @@ void AppGUI::RenderUI() {
             }
 
             /// Viewport
-            ImGui::Begin(" Viewport ", nullptr, ImGuiWindowFlags_NoScrollbar);
+            ImGui::Begin(" Viewport ", nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
             {
-
                 // Get Viewpost Window Size
                 ImVec2 windowSize = ImGui::GetWindowSize();
                 // Get Viewpost Window Position
-                ImVec2 windowPos = ImGui::GetWindowPos();
+				ImVec2 windowPos = ImGui::GetWindowPos();
 
                 ImGui::Image(reinterpret_cast<void*>(RenderImage(windowSize)), windowSize);
 
                 /// Performance Overlays
-
                 /// Last Image Render Time Overlay
                 {
                     // Set Overlay Window Dimensions
-                    float width = 215.0f;
+                    float width = 225.0f;
                     float height = 45.0f;
 
                     // Set Overlay Window Position
@@ -507,7 +448,7 @@ void AppGUI::RenderUI() {
 
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
                         ImGui::SetCursorPos(ImVec2(0.0f, 10.0f));
-                        ImGui::Text(" Image: %.3f ms", io.DeltaTime * 1000.0f);
+                        ImGui::Text(" Image: %.3f ms ", io.DeltaTime * 1000.0f);
                         ImGui::PopStyleColor();
                     }
                     ImGui::EndChild();
@@ -555,48 +496,66 @@ void AppGUI::RenderUI() {
                             NULL                                                            // Corner Radius
                         );
 
+                        /// Icon colors
 						ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 1.0f, 1.0f, 0.0f));
                         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.0f)); // Adjust hover color and transparency here
                         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 0.3333f, 0.0745f, 0.8f)); // Adjust hover color and transparency here
 
+                        /// Viewport Icons
 						ImGui::PushFont(icon);
+                        {
+                            // For Backward Step Button
+                            ImGui::SetCursorPos(ImVec2(30.0f, -10.0f));
+                            if (ImGui::Button(ICON_BACKWARD_STEP)) {
+                                ::watch.Reset();
+                                ::pausedTime = 0.0f;
+                                ::iTime = 0.0f;
+                            }
 
-                        // For Play & Pause Button
-						ImGui::SetCursorPos(ImVec2(30.0f, -10.0f));
-                        if (icons.playbutton) {
-                            if (ImGui::Button(ICON_PLAY)) {
-                                icons.playbutton = false;
+                            // For Play & Pause Button
+                            ImGui::SetCursorPos(ImVec2(70.0f, -10.0f));
+                            if (icons.playbutton) {
+                                // Stop the rendering cycle in RenderImage
+                                viewportPlay = false;
+                                if (ImGui::Button(ICON_PLAY)) {
+                                    icons.playbutton = false;
+                                }
                             }
-                        }
-                        else {
-                            // Stop the rendering cycle
-                            if (ImGui::Button(ICON_PAUSE)) {
-                                icons.playbutton = true;
+                            else {
+                                // Resume the rendering cycle in RenderImage
+                                viewportPlay = true;
+                                if (ImGui::Button(ICON_PAUSE)) {
+                                    icons.playbutton = true;
+                                }
                             }
-                        }
-                        // For Viewport Compress and Expand Button
-                        ImGui::SetCursorPos(ImVec2(windowSize.x - 60.0f, -10.0f)); // The default cursor position is set on here: SetNextWindowPos(ImVec2(windowPos.x, windowPos.y + windowSize.y - height)
 
-                        if (icons.expandbutton) {
-                            if (viewportExpand = ImGui::Button(ICON_EXPAND)) {
-                                viewportSize = windowSize;
-                                viewportPos = windowPos;
-                                icons.expandbutton = false;
+                            // For Viewport Compress and Expand Button
+                            ImGui::SetCursorPos(ImVec2(windowSize.x - 60.0f, -10.0f)); // The default cursor position is set on here: SetNextWindowPos(ImVec2(windowPos.x, windowPos.y + windowSize.y - height)
+                            if (icons.expandbutton) {
+                                if (viewportExpand = ImGui::Button(ICON_EXPAND)) {
+                                    icons.expandbutton = false;
+                                }
                             }
-                        }
-                        else {
-                            // Enlarge the viewport size to the application windowsize
-                            if (viewportShrink = ImGui::Button(ICON_COMPRESS)) {
-                                icons.expandbutton = true;
+                            else {
+                                if (viewportShrink = ImGui::Button(ICON_COMPRESS)) {
+                                    icons.expandbutton = true;
+                                }
                             }
+
                         }
                         ImGui::PopFont();
 
+                        /// Viewport Timing and Resolution
                         ImGui::PushFont(font1);
-                        ImGui::SetCursorPos(ImVec2(90.0f, 9.0f));
+                        ImGui::SetCursorPos(ImVec2(120.0f, 9.0f));
+                        ImGui::Text(" %.3f ", ::iTime);
+
+                        ImGui::SetCursorPos(ImVec2(270.0f, 9.0f));
                         ImGui::Text(" %.0f x %.0f ", windowSize.x, windowSize.y);
                         ImGui::PopFont();
+
 						ImGui::PopStyleColor(3);
+
                     }
                     ImGui::EndChild();
                 }
@@ -620,53 +579,6 @@ void AppGUI::RenderUI() {
 	}
 }
 
-bool AppGUI::LoadDLL() {
-
-    wchar_t exePath[MAX_PATH]; // Use wide-character string
-    GetModuleFileNameW(nullptr, exePath, MAX_PATH); // Use GetModuleFileNameW
-
-    // Extract directory from the path
-    std::wstring exeDirectory = std::wstring(exePath);
-    size_t pos = exeDirectory.find_last_of(L"\\/");
-    if (pos != std::wstring::npos) {
-        exeDirectory = exeDirectory.substr(0, pos);
-    }
-    
-    std::wstring dllPath = exeDirectory + L"\\" + wdllName;
-    
-    // Store exe and dll path to make it available globally
-    ::gdllPath = dllPath;
-    exeFilePath = Utils::ConvertWStringtoString(exeDirectory);
-
-    // Load the DLL
-    ::handle = LoadLibrary((LPCWSTR)dllPath.c_str());
-
-    if (!::handle) {
-
-        fileContent = "Error: Unable to load " + std::string(dllName);
-        // Handle the error (e.g., return or take appropriate action)
-        return false;
-    }
-    // Obtain function pointer to mainImage from DLL
-    ::mainImageFromDLL = reinterpret_cast<MainImageType>(GetProcAddress(::handle, "mainImage"));
-    if (!::mainImageFromDLL) {
-
-        fileContent = "Error: Undefined function 'mainImage()'\n";
-        // Handle the error (e.g., return or take appropriate action)
-        return false;
-    }
-    return true;
-}
-
-bool operator==(const ImVec2& lval, const ImVec2& rval) {
-    if (lval.x == rval.x && lval.y == rval.y) {
-        return true;
-    }
-    else {
-        return false;
-    }
-}
-
 void ::ProcessPixels(int startY, int endY, ImVec2 windowSize, glm::vec2 iResolution, float iTime) {
     for (int y = startY; y < endY; ++y) {
         for (int x = 0; x < windowSize.x; ++x) {
@@ -684,55 +596,99 @@ void ::ProcessPixels(int startY, int endY, ImVec2 windowSize, glm::vec2 iResolut
 
 SDL_Texture* AppGUI::RenderImage(ImVec2 windowSize) {
 
+    static bool renderInit = true;
     static ImVec2 lastWindowSize = { 0, 0 };
 
-    // On initialization
-    if (lastWindowSize == ImVec2(0, 0)) {
-        // Resize the buffer
-        ImageData.resize(static_cast<size_t>(windowSize.x) * static_cast<size_t>(windowSize.y));
+    /// Start the timer
+    watch.Start();
 
-        // Create a new texture with the changed size
-        sdl_instance.sdl_CreateTexture(windowSize.x, windowSize.y);
+    if (renderInit || viewportPlay) {
+
+        /// Note: Implement the pause feature in the timer
+        /// Get the current time and reset the pause timer
+        ::iTime = watch.GetTime() - ::pausedTime; // ImGui::GetTime()
+
+        renderInit = false;
+
+        // On initialization
+        if (lastWindowSize == ImVec2(0, 0)) {
+            // Resize the buffer
+            ImageData.resize(static_cast<size_t>(windowSize.x) * static_cast<size_t>(windowSize.y));
+
+            // Create a new texture with the changed size
+            sdl_instance.sdl_CreateTexture(windowSize.x, windowSize.y);
+        }
+        // On viewport resize
+        else if (windowSize.x != lastWindowSize.x || windowSize.y != lastWindowSize.y) {
+            // Destroy old SDL texture
+            sdl_instance.sdl_DeleteTexture();
+
+            // Resize the buffer
+            ImageData.resize(static_cast<size_t>(windowSize.x) * static_cast<size_t>(windowSize.y));
+
+            // Create a new texture with the changed size
+            sdl_instance.sdl_CreateTexture(windowSize.x, windowSize.y);
+        }
+
+        glm::vec2 iResolution = glm::vec2(windowSize.x, windowSize.y);
+
+        std::vector<std::thread> threads;
+        int numThreads = 10; // Number of threads
+        int rowsPerThread = windowSize.y / numThreads;
+
+        for (int i = 0; i < numThreads; ++i) {
+            int startY = i * rowsPerThread;
+            int endY = (i == numThreads - 1) ? windowSize.y : startY + rowsPerThread; // Ensure all rows are processed
+
+            threads.push_back(std::thread(::ProcessPixels, startY, endY, windowSize, iResolution, ::iTime));
+        }
+        for (auto& thread : threads) {
+            thread.join();
+        }
+
+        sdl_instance.sdl_DrawTexture(windowSize.x, windowSize.y, ImageData);
     }
-    // On viewport resize
-    else if (windowSize.x != lastWindowSize.x || windowSize.y != lastWindowSize.y) {
-        // Destroy old SDL texture
-        sdl_instance.sdl_DeleteTexture();
 
-        // Resize the buffer
-        ImageData.resize(static_cast<size_t>(windowSize.x) * static_cast<size_t>(windowSize.y));
+    else if (!viewportPlay) {
 
-        // Create a new texture with the changed size
-        sdl_instance.sdl_CreateTexture(windowSize.x, windowSize.y);
+        /// Get the time duration while viewport is paused
+        ::pausedTime = watch.GetTime() - ::iTime; // ImGui::GetTime()
+
+        if (isRecompiled || (windowSize.x != lastWindowSize.x || windowSize.y != lastWindowSize.y)) {
+            isRecompiled = false;
+
+            // Destroy old SDL texture
+            sdl_instance.sdl_DeleteTexture();
+
+            // Resize the buffer
+            ImageData.resize(static_cast<size_t>(windowSize.x) * static_cast<size_t>(windowSize.y));
+
+            // Create a new texture with the changed size
+            sdl_instance.sdl_CreateTexture(windowSize.x, windowSize.y);
+
+            glm::vec2 iResolution = glm::vec2(windowSize.x, windowSize.y);
+
+            std::vector<std::thread> threads;
+            int numThreads = 10; // Number of threads
+            int rowsPerThread = windowSize.y / numThreads;
+
+            for (int i = 0; i < numThreads; ++i) {
+                int startY = i * rowsPerThread;
+                int endY = (i == numThreads - 1) ? windowSize.y : startY + rowsPerThread; // Ensure all rows are processed
+
+                threads.push_back(std::thread(::ProcessPixels, startY, endY, windowSize, iResolution, ::iTime));
+            }
+            for (auto& thread : threads) {
+                thread.join();
+            }
+
+            sdl_instance.sdl_DrawTexture(windowSize.x, windowSize.y, ImageData);
+        }
     }
 
     // Update the windowsize
     lastWindowSize = windowSize;
 
-    glm::vec2 iResolution = glm::vec2(windowSize.x, windowSize.y);
-    float iTime = ImGui::GetTime();
-
-    //auto start = std::chrono::high_resolution_clock::now();
-
-    std::vector<std::thread> threads;
-    int numThreads = 10; // Number of threads
-    int rowsPerThread = windowSize.y / numThreads;
-
-    for (int i = 0; i < numThreads; ++i) {
-        int startY = i * rowsPerThread;
-        int endY = (i == numThreads - 1) ? windowSize.y : startY + rowsPerThread; // Ensure all rows are processed
-
-        threads.push_back(std::thread(::ProcessPixels, startY, endY, windowSize, iResolution, iTime));
-    }
-    for (auto& thread : threads) {
-        thread.join();
-    }
-
-    /*auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << "Elapsed Time: " << duration.count() << " milliseconds" << std::endl;*/
-
-    sdl_instance.sdl_DrawTexture(windowSize.x, windowSize.y, ImageData);
     return sdl_instance.sdl_TexturePtr;
 }
 
@@ -751,7 +707,7 @@ void AppGUI::RenderEditor(ImGuiIO& io) {
 		Utils::SaveFile(fileToEdit, editor.GetText());
 
 		// Uses CreateProcessW() for runtime compilation
-		Utils::CompileFileWithoutConsole(errorFilePath);
+		Utils::CompileFileWithoutConsole(errorFilePath, gdllPath, ::isRecompiled);
 
 		if (!std::filesystem::exists(errorFilePath)) {
 			// Create Error File if it doesn't exists
@@ -759,7 +715,7 @@ void AppGUI::RenderEditor(ImGuiIO& io) {
 		}
 
 		// Load Text File to show in ImGui Output Window
-		fileContent = Utils::LoadTxtFile();
+		fileContent = Utils::LoadTxtFile(errorFilePath);
 
 		// Reload the DLL
 		LoadDLL();
@@ -787,7 +743,7 @@ void AppGUI::RenderEditor(ImGuiIO& io) {
                 }
 
                 // Load Text File to show in ImGui Output Window
-                fileContent = Utils::LoadTxtFile();
+                fileContent = Utils::LoadTxtFile(errorFilePath);
 
                 // Reload the DLL
                 LoadDLL();

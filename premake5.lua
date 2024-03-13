@@ -32,7 +32,11 @@ project "FragTal"
 		"%{prj.name}/Text Editor/**.h",
 		"%{prj.name}/Text Editor/**.cpp",
 
-		"%{prj.name}/UI/**.h"
+		"%{prj.name}/UI/**.h",
+		"%{prj.name}/UI/**.cpp",
+
+		"%{prj.name}/Utils/**.h",
+		"%{prj.name}/Utils/**.cpp",
 	}
 
 	includedirs
@@ -42,7 +46,8 @@ project "FragTal"
 	
 	libdirs
 	{
-		"FragTal/deps/lib/" .. arch
+
+		"FragTal/deps/lib/" .. arch .. "/SDL lib-vc2022"
 	}
 
 	--postbuildcommands
@@ -59,14 +64,12 @@ project "FragTal"
 		-- Check if glm directory doesn't exist in the target directory before copying
 		"IF NOT EXIST \"%{cfg.targetdir}\\font\\\" xcopy /Q /Y /I \"%{wks.location}\\%{prj.name}\\font\\*.ttf\" \"%{cfg.targetdir}\\font\\\"",  -- Copy Fonts
 		"IF NOT EXIST \"%{cfg.targetdir}\\icon\\\" xcopy /Q /Y /I \"%{wks.location}\\%{prj.name}\\icon\\*.ttf\" \"%{cfg.targetdir}\\icon\\\"",  -- Copy Icons
-		"IF NOT EXIST \"%{cfg.targetdir}\\UI\\\"   xcopy /Q /Y /I \"%{wks.location}\\%{prj.name}\\UI\\*.h\" \"%{cfg.targetdir}\\UI\\\"",        -- Copy UI header file
     	"IF NOT EXIST \"%{cfg.targetdir}\\deps\\\" xcopy /Q /E /Y /I \"%{wks.location}\\%{prj.name}\\deps\\include\\glm\" \"%{cfg.targetdir}\\deps\\include\\glm\\\"", -- Copy GLM Math Library '/Y' for whole directory
 		"IF NOT EXIST \"%{cfg.targetdir}\\temp\\\" xcopy /Q /Y /I \"%{wks.location}\\%{prj.name}\\temp\\*.txt\" \"%{cfg.targetdir}\\temp\\\"", -- Copy Error.txt file
-    	"xcopy /Q /Y /I \"%{wks.location}\\%{prj.name}\\src\\Shader.cpp\" \"%{cfg.targetdir}\\src\\\"", -- Copy Shader.cpp file
-		"xcopy /Q /Y /I \"%{wks.location}\\%{prj.name}\\src\\Shader.h\"   \"%{cfg.targetdir}\\src\\\"", -- Copy Shader.h file
-    	"xcopy /Q /Y /I \"%{wks.location}\\%{prj.name}\\*.ini\"           \"%{cfg.targetdir}\\\""       -- Copy .ini file
+    	"IF NOT EXIST \"%{cfg.targetdir}\\UI\\\" md \"%{cfg.targetdir}\\UI\\\"",   -- Make the UI directory
+		"xcopy /Q /Y /I \"%{wks.location}\\%{prj.name}\\src\\Shader.cpp\" \"%{cfg.targetdir}\\src\\\"",  -- Copy Shader.cpp file
+		"xcopy /Q /Y /I \"%{wks.location}\\%{prj.name}\\src\\Shader.h\"   \"%{cfg.targetdir}\\src\\\""   -- Copy Shader.h file
 	}
-
 
 	filter "system:windows"
 		systemversion "latest"
@@ -79,6 +82,7 @@ project "FragTal"
 	buildoptions "/MTd"
 	links
 	{
+		--sdl2
 		"SDL2.lib",
 		"SDL2main.lib",
 		"SDL2test.lib"
@@ -93,8 +97,9 @@ project "FragTal"
 		buildoptions "/MT"
 		links
 		{
+			--sdl2
 			"SDL2.lib",
-			"SDL2main.lib",
+			"SDL2main.lib"
 		}
 		kind "WindowedApp"  -- Make release mode a windowed app
 
@@ -110,9 +115,10 @@ project "FragTal"
 
 	vstudio.vc2022["Debug"] = {
 		libDirs = { 
-			"deps/lib"
+			"deps/lib" .. arch .. "/SDL lib-vc2022"
 		},
-		links = { 
+		links = {
+			--sdl2
 			"SDL2.lib",
 			"SDL2main.lib",
 			"SDL2test.lib"
@@ -121,9 +127,10 @@ project "FragTal"
 
 	vstudio.vc2022["Release"] = {
 		libDirs = { 
-			"deps/lib"
+			"deps/lib" .. arch .. "/SDL lib-vc2022"
 		},
 		links = {
+			--sdl2
 			"SDL2.lib",
 			"SDL2main.lib"
 		}

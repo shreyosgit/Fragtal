@@ -2,7 +2,7 @@ In file included from src\..\deps\include\glm\detail/type_half.hpp:16,
                  from src\..\deps\include\glm\detail/func_packing.inl:5,
                  from src\..\deps\include\glm\packing.hpp:173,
                  from src\..\deps\include\glm\glm.hpp:132,
-                 from src\Shader.h:3,
+                 from src\Shader.h:2,
                  from src\Shader.cpp:1:
 src\..\deps\include\glm\detail/type_half.inl: In function 'float glm::detail::overflow()':
 src\..\deps\include\glm\detail/type_half.inl:9:27: warning: compound assignment with 'volatile'-qualified left operand is deprecated [-Wvolatile]

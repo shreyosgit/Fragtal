@@ -1,3 +1,3 @@
-# SDL_Template
+# FragTal
 
-This is a SDL2 template project for small scale 3D real time C++ application development
+This is a real time fragment shader editor made using ImGui & SDL2

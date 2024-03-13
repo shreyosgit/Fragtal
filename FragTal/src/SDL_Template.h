@@ -8,9 +8,6 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <filesystem>
-#include <fstream>
-#include <streambuf>
 
 #include "SDL\SDL.h"
 #include "glm\glm.hpp"
@@ -46,10 +43,11 @@ public:
 	SDL_Texture* sdl_TexturePtr;
 
 	int sdl_TextureSize;
+
 private:
+
 	const char* sdl_WindowTitle;
 	int sdl_WindowWidth, sdl_WindowHeight;
-	
 	
 	SDL_Rect sdl_ScrrenSize;
 
@@ -57,4 +55,3 @@ private:
 	void sdl_PrintError(std::string ErrorList);
 	void sdl_Quit();
 };
-
