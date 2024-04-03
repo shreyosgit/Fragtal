@@ -117,9 +117,3 @@ GLM::vec4 mainImage(glm::vec2 fragCoord, glm::vec2 iResolution, float iTime) {
     
     return fragColor;
 }
-
-
-
-
-
-
